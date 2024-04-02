@@ -25,42 +25,45 @@ fn main() {
         .get_matches();
 
     if let Some(_init_subcommand) = _matches.subcommand_matches("init") {
-        println!("Entered `init` subcommand");
-        let mut env_vars: HashMap<String, String> = HashMap::new();
+        init_subcommand();
+    }
+}
 
-        let options = MatchOptions {
-            case_sensitive: true,
-            require_literal_separator: false,
-            require_literal_leading_dot: true,
-        };
+fn init_subcommand() {
+    println!("Entered `init` subcommand");
+    let mut env_vars: HashMap<String, String> = HashMap::new();
 
-        let env_file_re = Regex::new(r"\.env(\.[^.]*)?$").unwrap();
-        let export_re = Regex::new(r"^([A-Za-z_][A-Za-z0-9_]*)=(.+)$").unwrap();
-        for entry in glob_with(".env*", options).expect("Failed to read glob operation") {
-            match entry {
-                Ok(path) => {
-                    let path_str = path.to_str().unwrap();
-                    if env_file_re.is_match(path_str) {
-                        if let Ok(file_data) = read_file_lines(path_str) {
-                            for line in file_data.flatten() {
-                                if export_re.is_match(&line) {
-                                    println!("{:?}", line);
-                                    let arr: Vec<String> =
-                                        line.split('=').map(|s| s.to_string()).collect();
-                                    env_vars.insert(arr[0].clone(), arr[1].clone());
-                                }
+    let options = MatchOptions {
+        case_sensitive: true,
+        require_literal_separator: false,
+        require_literal_leading_dot: true,
+    };
+
+    let env_file_re = Regex::new(r"\.env(\.[^.]*)?$").unwrap();
+    let export_re = Regex::new(r"^([A-Za-z_][A-Za-z0-9_]*)=(.+)$").unwrap();
+    for entry in glob_with(".env*", options).expect("Failed to read glob operation") {
+        match entry {
+            Ok(path) => {
+                let path_str = path.to_str().unwrap();
+                if env_file_re.is_match(path_str) {
+                    if let Ok(file_data) = read_file_lines(path_str) {
+                        for line in file_data.flatten() {
+                            if export_re.is_match(&line) {
+                                println!("{:?}", line);
+                                let arr: Vec<String> =
+                                    line.split('=').map(|s| s.to_string()).collect();
+                                env_vars.insert(arr[0].clone(), arr[1].clone());
                             }
                         }
                     }
                 }
-                Err(e) => println!("{:}", e),
             }
+            Err(e) => println!("{:}", e),
         }
-        println!("{:?}", env_vars);
-        hasmap_to_file(env_vars, "test.json")
     }
+    println!("{:?}", env_vars);
+    hasmap_to_file(env_vars, "test.json")
 }
-
 fn read_file_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
 where
     P: AsRef<Path>,
