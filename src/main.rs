@@ -10,6 +10,7 @@ use glob::glob_with;
 use glob::MatchOptions;
 use regex::Regex;
 use serde::Serialize;
+use std::cmp::{Eq, PartialEq};
 
 fn main() {
     let _matches = command!() // requires `cargo` feature
@@ -29,7 +30,7 @@ fn main() {
     }
 }
 
-#[derive(Serialize)]
+#[derive(Serialize, Eq, PartialEq, Hash)]
 struct EnvVarIndex {
     key: String,
     environment: String,
@@ -76,6 +77,13 @@ fn init_subcommand() {
                                     key: arr[0].clone(),
                                     environment: environment.to_string(),
                                 };
+                                if env_vars.is_empty() {
+                                    env_vars.insert(key_to_insert, arr[1].clone());
+                                } else if env_vars.contains_key(&key_to_insert) {
+                                    panic!("Already found environment key pair!")
+                                } else {
+                                    env_vars.insert(key_to_insert, arr[1].clone());
+                                }
                             }
                         }
                     }
