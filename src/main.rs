@@ -5,11 +5,11 @@ use std::io::BufRead;
 use std::io::Write;
 use std::path::Path;
 
+use clap::{command, Command};
 use glob::glob_with;
 use glob::MatchOptions;
 use regex::Regex;
-
-use clap::{command, Command};
+use serde::Serialize;
 
 fn main() {
     let _matches = command!() // requires `cargo` feature
@@ -29,9 +29,15 @@ fn main() {
     }
 }
 
+#[derive(Serialize)]
+struct EnvVarIndex {
+    key: String,
+    environment: String,
+}
+
 fn init_subcommand() {
     println!("Entered `init` subcommand");
-    let mut env_vars: HashMap<String, String> = HashMap::new();
+    let mut env_vars: HashMap<EnvVarIndex, String> = HashMap::new();
 
     let options = MatchOptions {
         case_sensitive: true,
@@ -41,18 +47,35 @@ fn init_subcommand() {
 
     let env_file_re = Regex::new(r"\.env(\.[^.]*)?$").unwrap();
     let export_re = Regex::new(r"^([A-Za-z_][A-Za-z0-9_]*)=(.+)$").unwrap();
+
+    let mut seen_base: bool = false;
+
     for entry in glob_with(".env*", options).expect("Failed to read glob operation") {
         match entry {
             Ok(path) => {
                 let path_str = path.to_str().unwrap();
                 if env_file_re.is_match(path_str) {
+                    // we have a  valid env file
+                    let parts: Vec<&str> = path_str.split(".").collect();
+
+                    let environment = match parts.get(1) {
+                        // if an index of 1 returns none then we have the base
+                        Some(&s) => s,
+                        None => "base",
+                    };
+
                     if let Ok(file_data) = read_file_lines(path_str) {
                         for line in file_data.flatten() {
                             if export_re.is_match(&line) {
-                                println!("{:?}", line);
+                                // we have a valid environment variable export
+                                //
                                 let arr: Vec<String> =
                                     line.split('=').map(|s| s.to_string()).collect();
-                                env_vars.insert(arr[0].clone(), arr[1].clone());
+
+                                let key_to_insert = EnvVarIndex {
+                                    key: arr[0].clone(),
+                                    environment: environment.to_string(),
+                                };
                             }
                         }
                     }
@@ -61,7 +84,6 @@ fn init_subcommand() {
             Err(e) => println!("{:}", e),
         }
     }
-    println!("{:?}", env_vars);
     hasmap_to_file(env_vars, "test.json")
 }
 fn read_file_lines<P>(filename: P) -> io::Result<io::Lines<io::BufReader<File>>>
@@ -72,7 +94,7 @@ where
     Ok(io::BufReader::new(file).lines())
 }
 
-fn hasmap_to_file(hashmap: HashMap<String, String>, filename: &str) {
+fn hasmap_to_file(hashmap: HashMap<EnvVarIndex, String>, filename: &str) {
     let json_string = serde_json::to_string(&hashmap).unwrap();
 
     let mut file = File::create(filename).expect("Failed to create file");
